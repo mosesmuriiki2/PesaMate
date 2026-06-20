@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "63392743695",
+    "project_id": "pesamate-78466",
+    "storage_bucket": "pesamate-78466.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:63392743695:android:e04e74254af31d5f45be7a",
+        "android_client_info": {
+          "package_name": "com.musafinance.pesamate"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCS-CFjcW2VJ3Dk21r0bvpwnuCFmVZ2R9M"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
