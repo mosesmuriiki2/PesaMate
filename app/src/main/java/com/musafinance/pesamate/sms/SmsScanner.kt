@@ -15,7 +15,7 @@ class SmsScanner @Inject constructor(
     private val repository: TransactionRepository
 ) {
 
-    suspend fun scanHistoricalSms(context: Context, forceRescan: Boolean = false) = withContext(Dispatchers.IO) {
+    suspend fun scanHistoricalSms(context: Context) = withContext(Dispatchers.IO) {
         android.util.Log.d("SmsScanner", "Starting deep PesaMate SMS scan...")
         
         val cursor = context.contentResolver.query(
@@ -68,15 +68,15 @@ class SmsScanner @Inject constructor(
                         repository.saveTransaction(entity)
                         
                         // Handle loan updates specifically
-                        if (parsed.type == TransactionType.LOAN_DISBURSEMENT) {
-                            val loanId = parsed.provider.replace(" ", "_")
+                        if (parsed.type == TransactionType.LOAN_DISBURSEMENT || parsed.type == TransactionType.LOAN_DUE) {
+                            val loanId = parsed.accountName?.replace(" ", "_") ?: parsed.provider.replace(" ", "_")
                             val loanEntity = LoanEntity(
                                 id = loanId,
                                 lender = parsed.provider,
-                                amountBorrowed = parsed.amount,
+                                amountBorrowed = if (parsed.type == TransactionType.LOAN_DISBURSEMENT) parsed.amount else 0.0,
                                 amountRepaid = 0.0,
                                 outstandingBalance = parsed.balance ?: parsed.amount,
-                                dueDate = dateMillis + (30L * 24 * 60 * 60 * 1000),
+                                dueDate = if (parsed.type == TransactionType.LOAN_DUE) System.currentTimeMillis() else (dateMillis + (30L * 24 * 60 * 60 * 1000)),
                                 interestRate = 0.0,
                                 isManual = false,
                                 isSynced = false

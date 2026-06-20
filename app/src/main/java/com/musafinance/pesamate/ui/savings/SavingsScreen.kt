@@ -18,6 +18,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.musafinance.pesamate.data.local.SavingsEntity
 import com.musafinance.pesamate.data.repository.TransactionRepository
+import com.musafinance.pesamate.sms.SmsScanner
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -29,7 +30,8 @@ import javax.inject.Inject
 
 @HiltViewModel
 class SavingsViewModel @Inject constructor(
-    private val repository: TransactionRepository
+    private val repository: TransactionRepository,
+    private val smsScanner: SmsScanner
 ) : ViewModel() {
 
     val savings: StateFlow<List<SavingsEntity>> = repository.allSavings
@@ -38,6 +40,12 @@ class SavingsViewModel @Inject constructor(
     val totalSavings: StateFlow<Double> = savings
         .map { it.sumOf { s -> s.balance } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
+
+    fun refresh(context: android.content.Context) {
+        viewModelScope.launch {
+            smsScanner.scanHistoricalSms(context)
+        }
+    }
 
     fun addManualSavings(name: String, amount: Double, provider: String) {
         viewModelScope.launch {
@@ -64,7 +72,11 @@ class SavingsViewModel @Inject constructor(
 fun SavingsScreen(viewModel: SavingsViewModel = hiltViewModel()) {
     val savingsList by viewModel.savings.collectAsState()
     val totalSavings by viewModel.totalSavings.collectAsState()
-    var showAddDialog by remember { mutableStateOf(false) }
+    val context = androidx.compose.ui.platform.LocalContext.current
+
+    LaunchedEffect(Unit) {
+        viewModel.refresh(context)
+    }
 
     Scaffold(
         topBar = {
@@ -74,11 +86,6 @@ fun SavingsScreen(viewModel: SavingsViewModel = hiltViewModel()) {
                     containerColor = MaterialTheme.colorScheme.primaryContainer
                 )
             )
-        },
-        floatingActionButton = {
-            FloatingActionButton(onClick = { showAddDialog = true }) {
-                Icon(Icons.Default.Add, contentDescription = "Add Savings")
-            }
         }
     ) { innerPadding ->
         Column(modifier = Modifier.padding(innerPadding).padding(16.dp)) {
@@ -89,7 +96,7 @@ fun SavingsScreen(viewModel: SavingsViewModel = hiltViewModel()) {
                 Column(modifier = Modifier.padding(24.dp)) {
                     Text("Total Savings", color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f))
                     Text(
-                        "KSh ${String.format("%,.2f", totalSavings)}",
+                        "KSh ${String.format(Locale.getDefault(), "%,.2f", totalSavings)}",
                         style = MaterialTheme.typography.headlineLarge,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onPrimary
@@ -114,16 +121,6 @@ fun SavingsScreen(viewModel: SavingsViewModel = hiltViewModel()) {
             }
         }
     }
-
-    if (showAddDialog) {
-        AddSavingsDialog(
-            onDismiss = { showAddDialog = false },
-            onConfirm = { name, amount, provider ->
-                viewModel.addManualSavings(name, amount, provider)
-                showAddDialog = false
-            }
-        )
-    }
 }
 
 @Composable
@@ -142,40 +139,11 @@ fun SavingsCard(item: SavingsEntity, onDelete: () -> Unit) {
                 Text(item.provider, fontSize = 12.sp, color = Color.Gray)
             }
             Column(horizontalAlignment = Alignment.End) {
-                Text("KSh ${String.format("%,.2f", item.balance)}", fontWeight = FontWeight.ExtraBold, color = Color(0xFF2E7D32))
+                Text("KSh ${String.format(Locale.getDefault(), "%,.2f", item.balance)}", fontWeight = FontWeight.ExtraBold, color = Color(0xFF2E7D32))
                 IconButton(onClick = onDelete) {
                     Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color.Gray)
                 }
             }
         }
     }
-}
-
-@Composable
-fun AddSavingsDialog(onDismiss: () -> Unit, onConfirm: (String, Double, String) -> Unit) {
-    var name by remember { mutableStateOf("") }
-    var amount by remember { mutableStateOf("") }
-    var provider by remember { mutableStateOf("") }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Add Savings Account") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Account Name (e.g. M-Shwari)") }, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(value = provider, onValueChange = { provider = it }, label = { Text("Provider (e.g. Safaricom)") }, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(value = amount, onValueChange = { amount = it }, label = { Text("Current Balance") }, modifier = Modifier.fillMaxWidth())
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = {
-                val amtVal = amount.toDoubleOrNull() ?: 0.0
-                if (name.isNotBlank() && amtVal >= 0) {
-                    onConfirm(name, amtVal, provider)
-                }
-            }) {
-                Text("Add")
-            }
-        }
-    )
 }

@@ -17,6 +17,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.musafinance.pesamate.data.local.LoanEntity
 import com.musafinance.pesamate.data.repository.TransactionRepository
+import com.musafinance.pesamate.sms.SmsScanner
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -26,7 +27,8 @@ import javax.inject.Inject
 
 @HiltViewModel
 class LoansViewModel @Inject constructor(
-    private val repository: TransactionRepository
+    private val repository: TransactionRepository,
+    private val smsScanner: SmsScanner
 ) : ViewModel() {
     
     val loans: StateFlow<List<LoanEntity>> = repository.allLoans
@@ -44,6 +46,12 @@ class LoansViewModel @Inject constructor(
     val totalOutstanding: StateFlow<Double> = loans
         .map { it.sumOf { loan -> loan.outstandingBalance } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
+
+    fun refreshLoans(context: android.content.Context) {
+        viewModelScope.launch {
+            smsScanner.scanHistoricalSms(context)
+        }
+    }
     
     fun addManualLoan(lender: String, amount: Double, interestRate: Double, dueDate: Long) {
         viewModelScope.launch {
@@ -83,7 +91,12 @@ fun LoansScreen(
     val loans by viewModel.loans.collectAsState()
     val loanOffers by viewModel.loanOffers.collectAsState()
     val totalOutstanding by viewModel.totalOutstanding.collectAsState()
-    var showAddDialog by remember { mutableStateOf(false) }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    
+    // Auto-refresh when entering screen
+    LaunchedEffect(Unit) {
+        viewModel.refreshLoans(context)
+    }
     
     Scaffold(
         topBar = {
@@ -93,13 +106,6 @@ fun LoansScreen(
                     containerColor = MaterialTheme.colorScheme.primaryContainer
                 )
             )
-        },
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = { showAddDialog = true }
-            ) {
-                Icon(Icons.Default.Add, contentDescription = "Add Loan")
-            }
         }
     ) { padding ->
         LazyColumn(
@@ -109,23 +115,15 @@ fun LoansScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Outstanding Summary
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.errorContainer
-                    )
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
                 ) {
-                    Column(
-                        modifier = Modifier.padding(20.dp)
-                    ) {
+                    Column(modifier = Modifier.padding(20.dp)) {
+                        Text("Total Outstanding", style = MaterialTheme.typography.titleMedium)
                         Text(
-                            "Total Outstanding",
-                            style = MaterialTheme.typography.titleMedium
-                        )
-                        Text(
-                            "KSh ${String.format("%,.2f", totalOutstanding)}",
+                            "KSh ${String.format(Locale.getDefault(), "%,.2f", totalOutstanding)}",
                             style = MaterialTheme.typography.headlineLarge,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.error
@@ -134,32 +132,15 @@ fun LoansScreen(
                 }
             }
             
-            // Active Loans
-            item {
-                Text(
-                    "Active Loans",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold
-                )
-            }
+            item { Text("Active Loans", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
             
             if (loans.isEmpty()) {
                 item {
                     Card(modifier = Modifier.fillMaxWidth()) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(24.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Icon(
-                                Icons.Default.AccountBalance,
-                                contentDescription = null,
-                                modifier = Modifier.size(48.dp),
-                                tint = MaterialTheme.colorScheme.primary
-                            )
+                        Column(modifier = Modifier.fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(Icons.Default.AccountBalance, contentDescription = null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.primary)
                             Spacer(modifier = Modifier.height(8.dp))
-                            Text("No active loans", style = MaterialTheme.typography.bodyLarge)
+                            Text("No active loans detected", style = MaterialTheme.typography.bodyLarge)
                         }
                     }
                 }
@@ -169,32 +150,16 @@ fun LoansScreen(
                 LoanItem(loan, onClear = { viewModel.clearLoan(loan.id) })
             }
             
-            // Loan Offers
             if (loanOffers.isNotEmpty()) {
                 item {
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        "Available Loan Offers",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Text("Available Loan Offers", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 }
-                
                 items(loanOffers) { offer ->
                     LoanOfferItem(offer)
                 }
             }
         }
-    }
-    
-    if (showAddDialog) {
-        AddLoanDialog(
-            onDismiss = { showAddDialog = false },
-            onAdd = { lender, amount, rate, due ->
-                viewModel.addManualLoan(lender, amount, rate, due)
-                showAddDialog = false
-            }
-        )
     }
 }
 
@@ -210,28 +175,14 @@ fun LoanItem(loan: LoanEntity, onClear: () -> Unit) {
                           else MaterialTheme.colorScheme.surfaceVariant
         )
     ) {
-        Column(
-            modifier = Modifier.padding(16.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        loan.lender,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        "Due: ${dateFormat.format(Date(loan.dueDate))}",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Text(loan.lender, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text("Due: ${dateFormat.format(Date(loan.dueDate))}", style = MaterialTheme.typography.bodyMedium)
                 }
                 IconButton(onClick = onClear) {
-                    Icon(Icons.Default.CheckCircle, contentDescription = "Clear Loan", tint = Color(0xFF2E7D32))
+                    Icon(Icons.Default.CheckCircle, contentDescription = "Clear", tint = Color(0xFF2E7D32))
                 }
             }
             
@@ -239,48 +190,24 @@ fun LoanItem(loan: LoanEntity, onClear: () -> Unit) {
 
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text(
-                    "KSh ${String.format("%,.2f", loan.outstandingBalance)}",
+                    "KSh ${String.format(Locale.getDefault(), "%,.2f", loan.outstandingBalance)}",
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.error
                 )
-                Text(
-                    "${loan.interestRate}% interest",
-                    style = MaterialTheme.typography.bodySmall
-                )
+                Text("${loan.interestRate}% interest", style = MaterialTheme.typography.bodySmall)
             }
             
             Spacer(modifier = Modifier.height(8.dp))
-            
-            LinearProgressIndicator(
-                progress = (loan.amountRepaid / loan.amountBorrowed.coerceAtLeast(1.0)).toFloat().coerceIn(0f, 1f),
-                modifier = Modifier.fillMaxWidth()
-            )
-            
-            Spacer(modifier = Modifier.height(4.dp))
-            
-            Text(
-                "Repaid: KSh ${String.format("%,.2f", loan.amountRepaid)} of KSh ${String.format("%,.2f", loan.amountBorrowed)}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            val progress = (loan.amountRepaid / loan.amountBorrowed.coerceAtLeast(1.0)).toFloat().coerceIn(0f, 1f)
+            LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
             
             if (daysUntilDue < 7) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        Icons.Default.Warning,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp),
-                        tint = MaterialTheme.colorScheme.error
-                    )
+                    Icon(Icons.Default.Warning, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.error)
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        "Due in $daysUntilDue days",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Text(if (daysUntilDue <= 0) "OVERDUE" else "Due in $daysUntilDue days", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -289,46 +216,20 @@ fun LoanItem(loan: LoanEntity, onClear: () -> Unit) {
 
 @Composable
 fun LoanOfferItem(offer: LoanOffer) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer
-        )
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+    Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
+        Row(modifier = Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Column {
-                Text(
-                    offer.lender,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    offer.description,
-                    style = MaterialTheme.typography.bodySmall
-                )
+                Text(offer.lender, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text(offer.description, style = MaterialTheme.typography.bodySmall)
             }
-            Text(
-                "KSh ${String.format("%,.2f", offer.amount)}",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary
-            )
+            Text("KSh ${String.format(Locale.getDefault(), "%,.2f", offer.amount)}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         }
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AddLoanDialog(
-    onDismiss: () -> Unit,
-    onAdd: (String, Double, Double, Long) -> Unit
-) {
+fun AddLoanDialog(onDismiss: () -> Unit, onAdd: (String, Double, Double, Long) -> Unit) {
     var lender by remember { mutableStateOf("") }
     var amount by remember { mutableStateOf("") }
     var interestRate by remember { mutableStateOf("") }
@@ -338,50 +239,18 @@ fun AddLoanDialog(
         onDismissRequest = onDismiss,
         title = { Text("Add Manual Loan") },
         text = {
-            Column(
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                OutlinedTextField(
-                    value = lender,
-                    onValueChange = { lender = it },
-                    label = { Text("Lender Name") },
-                    modifier = Modifier.fillMaxWidth()
-                )
-                OutlinedTextField(
-                    value = amount,
-                    onValueChange = { amount = it },
-                    label = { Text("Amount (KSh)") },
-                    modifier = Modifier.fillMaxWidth()
-                )
-                OutlinedTextField(
-                    value = interestRate,
-                    onValueChange = { interestRate = it },
-                    label = { Text("Interest Rate (%)") },
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Text(
-                    "Due: ${SimpleDateFormat("MMM dd, yyyy", Locale.getDefault()).format(Date(selectedDate))}",
-                    style = MaterialTheme.typography.bodyMedium
-                )
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(value = lender, onValueChange = { lender = it }, label = { Text("Lender") }, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(value = amount, onValueChange = { amount = it }, label = { Text("Amount") }, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(value = interestRate, onValueChange = { interestRate = it }, label = { Text("Interest %") }, modifier = Modifier.fillMaxWidth())
             }
         },
         confirmButton = {
-            TextButton(
-                onClick = {
-                    val amt = amount.toDoubleOrNull() ?: 0.0
-                    val rate = interestRate.toDoubleOrNull() ?: 0.0
-                    if (lender.isNotBlank() && amt > 0) {
-                        onAdd(lender, amt, rate, selectedDate)
-                    }
-                }
-            ) {
-                Text("Add")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel")
-            }
+            TextButton(onClick = {
+                val amt = amount.toDoubleOrNull() ?: 0.0
+                val rate = interestRate.toDoubleOrNull() ?: 0.0
+                if (lender.isNotBlank() && amt > 0) onAdd(lender, amt, rate, selectedDate)
+            }) { Text("Add") }
         }
     )
 }

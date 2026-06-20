@@ -30,7 +30,7 @@ object SmsParser {
         "(?i)([A-Z0-9]{10})\\s*Confirmed.*?\\s*(?:Ksh|KSh|KES)?\\s*([\\d,]+\\.\\d{2})\\s+(?:sent|transferred).*?\\s+to\\s+([^\\s]+(?:\\s+[^\\s]+)*?)\\s+on\\s+(\\d{1,2}/\\d{1,2}/\\d{2,4}).*?at\\s+(\\d{1,2}:\\d{2}\\s*[APMapm]{2}).*?balance.*?is\\s*(?:Ksh|KSh|KES)?\\s*([\\d,]+\\.\\d{2})"
     )
     
-    // 2. M-Pesa Received Money Pattern (Flexible for tight spacing and global names)
+    // 2. M-Pesa Received Money Pattern (Highly flexible)
     private val mpesaReceivedPattern = Pattern.compile(
         "(?i)([A-Z0-9]{10})\\s*Confirmed.*?You have received\\s*(?:Ksh|KSh|KES)?\\s*([\\d,]+\\.\\d{2})\\s+from\\s+(.*?)\\s+on\\s+(\\d{1,2}/\\d{1,2}/\\d{2,4}).*?at\\s+(\\d{1,2}:\\d{2}\\s*[APMapm]{2}).*?balance.*?is\\s*(?:Ksh|KSh|KES)?\\s*([\\d,]+\\.\\d{2})"
     )
@@ -40,7 +40,7 @@ object SmsParser {
         "(?i)([A-Z0-9]{10})\\s*Confirmed.*?\\s*(?:Ksh|KSh|KES)?\\s*([\\d,]+\\.\\d{2})\\s+paid\\s+to\\s+(.*?)\\.\\s*on (\\d{1,2}/\\d{1,2}/\\d{2,4}).*?at\\s+(\\d{1,2}:\\d{2}\\s*[APMapm]{2}).*?balance.*?is\\s*(?:Ksh|KSh|KES)?\\s*([\\d,]+\\.\\d{2})"
     )
 
-    // 4. Loan Disbursal (Banks, Apps, Mobile Money)
+    // 4. Loan Disbursal (Banks, Apps)
     private val loanDisbursedPattern = Pattern.compile(
         "(?i)([A-Z0-9]{10})?\\s*(?:Confirmed|Dear|Hello).*?(?:borrowed|disbursed|approved|loan|advance|credit|offered).*?\\s*(?:Ksh|KES|\\$|£|€)?\\s*([\\d,]+\\.\\d{2}).*?(?:from|by)?\\s*([^\\s]+(?:\\s+[^\\s]+){0,2})"
     )
@@ -50,7 +50,7 @@ object SmsParser {
         "(?i)([A-Z0-9]{10})\\s*Confirmed.*?Fuliza.*?amount is\\s*(?:Ksh|KSh|KES)?\\s*([\\d,]+\\.\\d{2}).*?outstanding.*?is\\s*(?:Ksh|KSh|KES)?\\s*([\\d,]+\\.\\d{2})"
     )
 
-    // 6. Savings Deposit (M-Shwari, KCB M-Pesa, Lock, Savings, Bank)
+    // 6. Savings Deposit
     private val savingsDepositPattern = Pattern.compile(
         "(?i)([A-Z0-9]{10})\\s*Confirmed.*?\\s*(?:Ksh|KSh|KES)?\\s*([\\d,]+\\.\\d{2})\\s+(?:transferred|saved|deposited|sent)\\s+to\\s+(?:your\\s+)?(M-Shwari|KCB M-PESA|Lock|Savings|Bank|Account).*?balance.*?is\\s*(?:Ksh|KSh|KES)?\\s*([\\d,]+\\.\\d{2})"
     )
@@ -74,10 +74,15 @@ object SmsParser {
     private val overdueLoanPattern = Pattern.compile(
         "(?i)(?:Dear|Hello).*?your\\s+(.*?)\\s+loan.*?overdue.*?([\\d,]+(?:\\.\\d{2})?)"
     )
+    
+    // 10b. Secondary Overdue Pattern (Amount comes later)
+    private val overdueLoanPattern2 = Pattern.compile(
+        "(?i)(?:Dear|Hello).*?your\\s+(.*?)\\s+loan.*?overdue.*?Ksh\\.?\\s*([\\d,]+(?:\\.\\d{2})?)"
+    )
 
-    // 11. Global Pay / Failed Transaction
+    // 11. Failed Transaction / Global Pay (Insufficient Funds)
     private val failedTransactionPattern = Pattern.compile(
-        "(?i)unable to process.*?transaction on\\s+(.*?)\\s+due to insufficient funds"
+        "(?i)unable to process.*?transaction on\\s+(.*?)\\s+(?:due to insufficient funds|due to)"
     )
 
     fun parse(smsBody: String, smsSender: String): ParsedTransaction? {
@@ -85,8 +90,9 @@ object SmsParser {
         val defaultDate = Date()
 
         try {
-            // 1. Overdue Loan Check (Priority)
+            // 1. Overdue Loan Check
             var matcher = overdueLoanPattern.matcher(cleanBody)
+            if (!matcher.find()) matcher = overdueLoanPattern2.matcher(cleanBody)
             if (matcher.find()) {
                 val type = matcher.group(1)?.trim() ?: "Loan"
                 val amount = matcher.group(2)?.replace(",", "")?.toDoubleOrNull() ?: 0.0
@@ -169,7 +175,7 @@ object SmsParser {
                     accountName = null,
                     balance = null,
                     date = defaultDate,
-                    description = "Failed payment to $merchant",
+                    description = "Declined: $merchant",
                     rawBody = cleanBody
                 )
             }
