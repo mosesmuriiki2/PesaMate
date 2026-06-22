@@ -35,6 +35,9 @@ class SettingsViewModel @Inject constructor(
     
     val isBiometricEnabled: StateFlow<Boolean> = themePreferences.isBiometricEnabled
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
+    val isCloudSyncEnabled: StateFlow<Boolean> = themePreferences.isCloudSyncEnabled
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
     
     val dailyLimit: StateFlow<Double> = themePreferences.dailyLimit
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
@@ -48,6 +51,12 @@ class SettingsViewModel @Inject constructor(
     fun toggleBiometric(enabled: Boolean) {
         viewModelScope.launch {
             themePreferences.toggleBiometric(enabled)
+        }
+    }
+
+    fun toggleCloudSync(enabled: Boolean) {
+        viewModelScope.launch {
+            themePreferences.toggleCloudSync(enabled)
         }
     }
     
@@ -73,6 +82,7 @@ fun SettingsScreen(
     val context = LocalContext.current
     val isDarkMode by viewModel.isDarkMode.collectAsState()
     val isBiometricEnabled by viewModel.isBiometricEnabled.collectAsState()
+    val isCloudSyncEnabled by viewModel.isCloudSyncEnabled.collectAsState()
     val dailyLimit by viewModel.dailyLimit.collectAsState()
     var showLimitDialog by remember { mutableStateOf(false) }
 
@@ -109,9 +119,17 @@ fun SettingsScreen(
                             onCheckedChange = { viewModel.toggleBiometric(it) }
                         )
                         HorizontalDivider()
+                        SettingsToggle(
+                            title = "Encrypted Cloud Sync",
+                            subtitle = "Backup and restore data across devices",
+                            icon = Icons.Default.CloudSync,
+                            checked = isCloudSyncEnabled,
+                            onCheckedChange = { viewModel.toggleCloudSync(it) }
+                        )
+                        HorizontalDivider()
                         SettingsAction(
-                            title = "Data Encryption",
-                            subtitle = "PesaMate uses AES-256 for local storage",
+                            title = "Local Encryption",
+                            subtitle = "Your data is stored with AES-256",
                             icon = Icons.Default.VerifiedUser,
                             action = {}
                         )
@@ -124,12 +142,16 @@ fun SettingsScreen(
                 SettingsCard {
                     Column {
                         SettingsAction(
-                            title = "Restore from Cloud",
-                            subtitle = "Pull data from your Firestore backup",
-                            icon = Icons.Default.CloudSync,
+                            title = "Manual Data Refresh",
+                            subtitle = "Re-sync latest data from your secure cloud",
+                            icon = Icons.Default.Refresh,
                             action = { 
-                                viewModel.triggerSync()
-                                Toast.makeText(context, "Pulling data...", Toast.LENGTH_SHORT).show()
+                                if (isCloudSyncEnabled) {
+                                    viewModel.triggerSync()
+                                    Toast.makeText(context, "Pulling data...", Toast.LENGTH_SHORT).show()
+                                } else {
+                                    Toast.makeText(context, "Enable Cloud Sync first", Toast.LENGTH_SHORT).show()
+                                }
                             }
                         )
                         HorizontalDivider()

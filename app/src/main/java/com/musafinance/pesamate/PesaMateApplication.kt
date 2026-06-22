@@ -5,7 +5,6 @@ import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import com.musafinance.pesamate.notifications.NotificationHelper
 import com.musafinance.pesamate.sync.SyncManager
-import com.google.android.gms.ads.MobileAds
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
 
@@ -23,9 +22,6 @@ class PesaMateApplication : Application(), Configuration.Provider {
         
         // Initialize notification channels
         NotificationHelper.createNotificationChannels(this)
-
-        // Initialize Mobile Ads SDK
-        MobileAds.initialize(this) {}
         
         // Schedule periodic sync
         syncManager.schedulePeriodicSync()

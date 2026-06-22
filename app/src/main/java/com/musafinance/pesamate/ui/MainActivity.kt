@@ -12,6 +12,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.biometric.BiometricPrompt
+import androidx.compose.animation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -19,6 +20,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
@@ -57,6 +59,9 @@ class MainViewModel @Inject constructor(
     val hasSeenOnboarding: StateFlow<Boolean> = themePreferences.hasSeenOnboarding
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
+    val isCloudSyncEnabled: StateFlow<Boolean> = themePreferences.isCloudSyncEnabled
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
     fun startSync() {
         viewModelScope.launch {
             _isScanning.value = true
@@ -74,6 +79,12 @@ class MainViewModel @Inject constructor(
     fun completeOnboarding() {
         viewModelScope.launch {
             themePreferences.setHasSeenOnboarding(true)
+        }
+    }
+
+    fun toggleCloudSync(enabled: Boolean) {
+        viewModelScope.launch {
+            themePreferences.toggleCloudSync(enabled)
         }
     }
 }
@@ -151,6 +162,16 @@ class MainActivity : FragmentActivity() {
         val navBackStackEntry by navController.currentBackStackEntryAsState()
         val currentDestination = navBackStackEntry?.destination
         val currentRoute = currentDestination?.route
+        
+        var showPrivacyDisclosure by remember { mutableStateOf(false) }
+        val hasSeenOnboarding by mainViewModel.hasSeenOnboarding.collectAsState()
+        
+        // Show disclosure once after onboarding
+        LaunchedEffect(hasSeenOnboarding) {
+            if (hasSeenOnboarding) {
+                showPrivacyDisclosure = true
+            }
+        }
 
         ModalNavigationDrawer(
             drawerState = drawerState,
@@ -163,7 +184,7 @@ class MainActivity : FragmentActivity() {
                         NavigationDrawerItem(
                             icon = { Icon(screen.icon, contentDescription = null) },
                             label = { Text(screen.title) },
-                            selected = currentDestination?.hierarchy?.any { it.route == screen.route } == true,
+                            selected = currentRoute == screen.route,
                             onClick = {
                                 scope.launch { drawerState.close() }
                                 navController.navigate(screen.route) {
@@ -219,6 +240,16 @@ class MainActivity : FragmentActivity() {
                 }
             }
         }
+        
+        if (showPrivacyDisclosure) {
+            PrivacyDisclosureDialog(
+                onDismiss = { showPrivacyDisclosure = false },
+                onEnableCloud = { 
+                    mainViewModel.toggleCloudSync(true)
+                    showPrivacyDisclosure = false
+                }
+            )
+        }
     }
 
     @Composable
@@ -268,6 +299,35 @@ class MainActivity : FragmentActivity() {
                 }
             }
         }
+    }
+
+    @Composable
+    fun PrivacyDisclosureDialog(onDismiss: () -> Unit, onEnableCloud: () -> Unit) {
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            title = { Text("Privacy & Data Security") },
+            text = {
+                Column {
+                    Text("PesaMate values your privacy. We want you to know how your data is handled:")
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text("• SMS processing is done strictly on your device.", fontWeight = FontWeight.Bold)
+                    Text("• We do not read personal conversations.", fontWeight = FontWeight.Bold)
+                    Text("• Your data is encrypted using AES-256 standards.")
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text("Would you like to enable encrypted cloud backup to restore your data on other devices? (Disabled by default)")
+                }
+            },
+            confirmButton = {
+                Button(onClick = onEnableCloud) {
+                    Text("Enable Backup")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = onDismiss) {
+                    Text("Keep Local Only")
+                }
+            }
+        )
     }
 
     private fun showBiometricPrompt() {

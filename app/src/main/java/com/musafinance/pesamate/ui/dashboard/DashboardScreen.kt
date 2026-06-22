@@ -27,7 +27,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.musafinance.pesamate.data.local.TransactionEntity
 import com.musafinance.pesamate.data.repository.TransactionRepository
 import com.musafinance.pesamate.sync.SyncManager
-import com.musafinance.pesamate.ui.components.AdBanner
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
@@ -203,10 +202,6 @@ fun DashboardScreen(
                             }
                         }
                     }
-                }
-
-                item {
-                    AdBanner(modifier = Modifier.padding(vertical = 8.dp))
                 }
 
                 item {

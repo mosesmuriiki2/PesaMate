@@ -23,6 +23,7 @@ class ThemePreferences @Inject constructor(
     private val LAST_NOTIFIED_THRESHOLD = intPreferencesKey("last_notified_threshold")
     private val LAST_NOTIFIED_DATE = stringPreferencesKey("last_notified_date")
     private val HAS_SEEN_ONBOARDING_KEY = booleanPreferencesKey("has_seen_onboarding")
+    private val CLOUD_SYNC_KEY = booleanPreferencesKey("cloud_sync_enabled")
     
     val isDarkMode: Flow<Boolean> = context.dataStore.data
         .map { preferences ->
@@ -57,6 +58,11 @@ class ThemePreferences @Inject constructor(
     val hasSeenOnboarding: Flow<Boolean> = context.dataStore.data
         .map { preferences ->
             preferences[HAS_SEEN_ONBOARDING_KEY] ?: false
+        }
+
+    val isCloudSyncEnabled: Flow<Boolean> = context.dataStore.data
+        .map { preferences ->
+            preferences[CLOUD_SYNC_KEY] ?: false
         }
     
     suspend fun toggleDarkMode(enabled: Boolean) {
@@ -93,6 +99,12 @@ class ThemePreferences @Inject constructor(
     suspend fun setHasSeenOnboarding(seen: Boolean) {
         context.dataStore.edit { preferences ->
             preferences[HAS_SEEN_ONBOARDING_KEY] = seen
+        }
+    }
+
+    suspend fun toggleCloudSync(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[CLOUD_SYNC_KEY] = enabled
         }
     }
 }

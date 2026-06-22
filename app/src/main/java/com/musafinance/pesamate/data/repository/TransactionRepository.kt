@@ -5,6 +5,7 @@ import android.util.Log
 import com.musafinance.pesamate.data.local.*
 import com.musafinance.pesamate.notifications.SpendingLimitMonitor
 import com.musafinance.pesamate.notifications.NotificationHelper
+import com.musafinance.pesamate.ui.theme.ThemePreferences
 import com.google.firebase.firestore.FirebaseFirestore
 import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -19,6 +20,7 @@ class TransactionRepository @Inject constructor(
     private val pesamateDao: PesaMateDao,
     private val firestore: FirebaseFirestore,
     private val spendingLimitMonitor: SpendingLimitMonitor,
+    private val themePreferences: ThemePreferences,
     @ApplicationContext private val context: Context
 ) {
     val allTransactions: Flow<List<TransactionEntity>> = pesamateDao.getAllTransactionsFlow()
@@ -49,11 +51,9 @@ class TransactionRepository @Inject constructor(
                     lastUpdated = System.currentTimeMillis()
                 ))
             }
-            Log.d("TransactionRepository", "Updated savings for $accountId: +${tx.amount}")
         } else if (tx.category.contains("Withdrawal", true)) {
             val accountId = tx.sender ?: tx.provider
             pesamateDao.updateSavingsBalance(accountId, -tx.amount)
-            Log.d("TransactionRepository", "Updated savings for $accountId: -${tx.amount}")
         }
 
         // Show notification for new transaction
@@ -84,37 +84,43 @@ class TransactionRepository @Inject constructor(
             spendingLimitMonitor.checkDailyLimit()
         }
 
-        // Try syncing with Firebase Firestore immediately (best effort)
-        try {
-            firestore.collection("transactions")
-                .document(tx.id)
-                .set(tx.copy(isSynced = true))
-                .await()
-            pesamateDao.insertTransaction(tx.copy(isSynced = true))
-        } catch (e: Exception) {
-            Log.e("TransactionRepository", "Error syncing transaction", e)
+        // Cloud sync if enabled
+        if (themePreferences.isCloudSyncEnabled.first()) {
+            try {
+                firestore.collection("transactions")
+                    .document(tx.id)
+                    .set(tx.copy(isSynced = true))
+                    .await()
+                pesamateDao.insertTransaction(tx.copy(isSynced = true))
+            } catch (e: Exception) {
+                Log.e("TransactionRepository", "Error syncing transaction", e)
+            }
         }
     }
 
     suspend fun saveLoan(loan: LoanEntity) {
         pesamateDao.insertLoan(loan)
-        try {
-            firestore.collection("loans")
-                .document(loan.id)
-                .set(loan.copy(isSynced = true))
-                .await()
-            pesamateDao.insertLoan(loan.copy(isSynced = true))
-        } catch (e: Exception) {
-            Log.e("TransactionRepository", "Error syncing loan", e)
+        if (themePreferences.isCloudSyncEnabled.first()) {
+            try {
+                firestore.collection("loans")
+                    .document(loan.id)
+                    .set(loan.copy(isSynced = true))
+                    .await()
+                pesamateDao.insertLoan(loan.copy(isSynced = true))
+            } catch (e: Exception) {
+                Log.e("TransactionRepository", "Error syncing loan", e)
+            }
         }
     }
 
     suspend fun deleteLoan(id: String) {
         pesamateDao.deleteLoan(id)
-        try {
-            firestore.collection("loans").document(id).delete().await()
-        } catch (e: Exception) {
-            Log.e("TransactionRepository", "Error deleting loan from cloud", e)
+        if (themePreferences.isCloudSyncEnabled.first()) {
+            try {
+                firestore.collection("loans").document(id).delete().await()
+            } catch (e: Exception) {
+                Log.e("TransactionRepository", "Error deleting loan from cloud", e)
+            }
         }
     }
 
@@ -151,6 +157,7 @@ class TransactionRepository @Inject constructor(
     }
     
     suspend fun syncFromFirestore() {
+        if (!themePreferences.isCloudSyncEnabled.first()) return
         try {
             Log.d("TransactionRepository", "Fetching transactions from Firestore...")
             val snapshot = firestore.collection("transactions")
@@ -193,6 +200,7 @@ class TransactionRepository @Inject constructor(
     }
 
     suspend fun syncUnsyncedData() {
+        if (!themePreferences.isCloudSyncEnabled.first()) return
         try {
             val unsyncedTransactions = allTransactions.first().filter { !it.isSynced }
             for (tx in unsyncedTransactions) {

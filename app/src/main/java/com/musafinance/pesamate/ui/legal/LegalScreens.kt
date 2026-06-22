@@ -24,20 +24,23 @@ fun PrivacyPolicyScreen() {
                 .padding(16.dp)
                 .verticalScroll(rememberScrollState())
         ) {
-            Text("Privacy Policy", fontSize = 24.sp, fontWeight = FontWeight.Bold)
-            Spacer(modifier = Modifier.height(16.dp))
+            Text("Privacy Policy", fontSize = 28.sp, fontWeight = FontWeight.ExtraBold)
+            Text("Last Updated: June 20, 2026", style = MaterialTheme.typography.bodySmall)
+            Spacer(modifier = Modifier.height(24.dp))
             
-            LegalSection("Overview", "PesaMate (\"we\", \"us\", or \"our\") is committed to protecting your privacy. This Privacy Policy explains how we collect, use, and safeguard your financial information when you use our mobile application.")
+            LegalSection("1. Commitment to Privacy", "PesaMate is built with a 'Privacy-First' architecture. We understand that your financial data is highly sensitive and we are committed to protecting it through strictly local processing and state-of-the-art encryption.")
             
-            LegalSection("Data Processing (Local-First)", "PesaMate operates on a 'local-first' principle. Your SMS financial notifications are scanned and processed locally on your device using on-device machine learning and regex algorithms. We do not transmit your raw SMS messages to our servers.")
+            LegalSection("2. On-Device Local Processing", "Unlike traditional finance apps, PesaMate performs all SMS scanning and transaction analysis directly on your smartphone. We do not transmit your raw SMS messages, personal conversations, or contact lists to any server.")
             
-            LegalSection("Information We Collect", "To provide financial tracking, we extract transaction amounts, merchant names, categories, and dates from SMS messages sent by financial institutions (Banks, Mobile Money, Loan Apps). We do not read personal or non-financial messages.")
+            LegalSection("3. Data We Collect", "To provide automated financial tracking, PesaMate requests access to your SMS messages. We selectively extract only financial metadata: transaction amounts, merchant/provider names, dates, and account identifiers. We do not store or process non-financial personal messages.")
             
-            LegalSection("Data Security", "We implement industry-standard security measures, including AES-256 encryption for local data storage and secure TLS connections for encrypted cloud backups (if enabled by you).")
+            LegalSection("4. Optional Encrypted Cloud Sync", "If you choose to enable 'Cloud Sync' in Settings, PesaMate will upload your processed transaction data to a secure Google Firebase database. This data is encrypted in transit and at rest. This feature is disabled by default to ensure maximum privacy for local-only users.")
             
-            LegalSection("User Rights & Transparency", "You have full control over your data. You can delete your local database or your cloud backup at any time within the app settings. PesaMate does not sell or share your financial data with third-party advertisers.")
+            LegalSection("5. Data Security (AES-256)", "Your local database is secured using industry-standard AES-256 encryption. We also support Biometric Authentication (Fingerprint/Facial Scan) to prevent unauthorized local access to your financial dashboard.")
             
-            LegalSection("Compliance", "This policy is designed to comply with global data protection standards, including GDPR and CCPA, ensuring transparency and user agency.")
+            LegalSection("6. Compliance with Global Standards", "This policy is designed to comply with international regulations, including the GDPR (General Data Protection Regulation) and CCPA (California Consumer Privacy Act). You have the right to delete your data at any time via the app settings.")
+            
+            LegalSection("7. Third-Party Services", "PesaMate does not sell or lease your financial data to third-party advertisers. We have removed all ad-tracking SDKs (including AdMob) to maintain a clean, private experience for our users.")
         }
     }
 }
@@ -56,18 +59,19 @@ fun TermsConditionsScreen() {
                 .padding(16.dp)
                 .verticalScroll(rememberScrollState())
         ) {
-            Text("Terms & Conditions", fontSize = 24.sp, fontWeight = FontWeight.Bold)
-            Spacer(modifier = Modifier.height(16.dp))
+            Text("Terms & Conditions", fontSize = 28.sp, fontWeight = FontWeight.ExtraBold)
+            Text("Last Updated: June 20, 2026", style = MaterialTheme.typography.bodySmall)
+            Spacer(modifier = Modifier.height(24.dp))
             
-            LegalSection("Acceptance of Terms", "By downloading or using PesaMate, you agree to these Terms and Conditions. If you disagree with any part of these terms, you must immediately stop using the application.")
+            LegalSection("1. Acceptance of Terms", "By accessing or using PesaMate, you agree to be bound by these Terms. If you do not agree, you must discontinue use immediately.")
             
-            LegalSection("Grant of Permissions", "The app requires READ_SMS and RECEIVE_SMS permissions to function. You acknowledge that providing these permissions allows PesaMate to analyze your financial notifications for the purpose of personal finance management.")
+            LegalSection("2. SMS Permission", "You grant PesaMate permission to read and analyze financial SMS notifications. You represent that you are the primary user of the device and have the legal right to access these notifications.")
             
-            LegalSection("No Financial Advice", "PesaMate is a data visualization and tracking tool. It does not provide professional financial, investment, or legal advice. All financial decisions are your sole responsibility.")
+            LegalSection("3. No Financial Advice", "The insights, charts, and reports provided by PesaMate are for informational and educational purposes only. They do not constitute professional financial, investment, or tax advice.")
             
-            LegalSection("Limitation of Liability", "PesaMate and its developers are not liable for any financial inaccuracies, bank errors, missed loan deadlines, or losses resulting from the use of the app. The automated tracking is provided 'as-is'.")
+            LegalSection("4. Disclaimer of Liability", "PesaMate is provided 'as-is' and 'as-available'. We are not responsible for inaccuracies caused by bank SMS formatting changes, device errors, or any financial losses incurred through the use of the app.")
             
-            LegalSection("Subscription Services", "If you use PesaMate to track recurring payments, you acknowledge that the app is not responsible for making actual payments or managing your subscriptions with third-party vendors.")
+            LegalSection("5. User Data Responsibility", "You are responsible for securing your device and managing your Biometric or PIN access. If you enable Cloud Sync, you are responsible for maintaining the security of your Google account.")
         }
     }
 }
@@ -76,7 +80,7 @@ fun TermsConditionsScreen() {
 fun LegalSection(title: String, content: String) {
     Column(modifier = Modifier.padding(vertical = 12.dp)) {
         Text(title, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(content, style = MaterialTheme.typography.bodyMedium, lineHeight = 20.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(content, style = MaterialTheme.typography.bodyMedium, lineHeight = 22.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
